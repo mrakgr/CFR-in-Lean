@@ -9,18 +9,17 @@ structure Node {𝔸 : Type*} (actions : Σ (n : nat), fin n → 𝔸) := mk ::
     (strategy_sum : array actions.1 rat) 
     (regret_sum : array actions.1 rat)
 
-def Infosets {ℍ 𝔸 : Type*} [lt : has_lt ℍ]
-        (actions : ∀ (h : ℍ), Σ action_count, fin action_count → 𝔸)
-    := drbmap ℍ (Node ∘ actions) lt.lt
+def Infosets {ℍ 𝔸 : Type*} [lt : has_lt ℍ] (ha : HistoryToActions ℍ 𝔸) 
+    := drbmap ℍ (Node ∘ ha) lt.lt
 
-def Node_from_actions {𝔸 : Type*} (actions : Σ (n : nat), fin n → 𝔸) := 
+def Node_from_actions {𝔸 : Type*} (actions : Actions 𝔸) := 
     {Node . 
         strategy_sum := array.init actions.1 (fun _, 0), 
         regret_sum := array.init actions.1 (fun _, 0)
         }
 
 def response {ℍ 𝔸 : Type*} [lt : has_lt ℍ] [decidable_rel lt.lt]
-        (ha : ℍ → Σ (n : nat), fin n → 𝔸)
+        (ha : HistoryToActions ℍ 𝔸)
         (is_updateable : bool) (h : ℍ) (one_probability two_probability : rat) 
         (next : 𝔸 → rat → Infosets ha -> rat × Infosets ha) (infosets : Infosets ha) 
         : rat × Infosets ha :=
@@ -32,7 +31,7 @@ def response {ℍ 𝔸 : Type*} [lt : has_lt ℍ] [decidable_rel lt.lt]
                 if action_probability = 0 ∧ two_probability = 0 then (0, infosets) -- the pruning optimization
                 else next action (one_probability * action_probability) infosets
                 ) in
-    let action_utility_utility_weighted_sum := 
+    let action_utility_weighted_sum := 
         @nat.foldl.fin (fun i, rat) (ha h').1 0 
             (fun i s, s + action_utility.read i * action_probability.read i) in
     let infosets := 
@@ -41,9 +40,38 @@ def response {ℍ 𝔸 : Type*} [lt : has_lt ℍ] [decidable_rel lt.lt]
             let add (f : ℚ → ℚ) (a b : array (ha h').1 ℚ) := array.map₂ (fun s x, s + f x) a b in 
             infosets.insert h' {
                 strategy_sum := add (fun action_probability, one_probability * action_probability) node.strategy_sum action_probability,
-                regret_sum := add (fun action_utility, two_probability * (action_utility - action_utility_utility_weighted_sum)) node.regret_sum action_utility
+                regret_sum := add (fun action_utility, two_probability * (action_utility - action_utility_weighted_sum)) node.regret_sum action_utility
                 }
         | ff := infosets
         end in
 
-    (-action_utility_utility_weighted_sum, infosets)
+    (-action_utility_weighted_sum, infosets)
+
+def chance {ℍ 𝔸 Δ : Type*} [has_lt ℍ]
+        (ha : HistoryToActions ℍ 𝔸) 
+        (dice : Σ n, fin n → rat × Δ)
+        (one_probability : rat) 
+        (next : Δ → rat → Infosets ha -> rat × Infosets ha)
+        (infosets : Infosets ha) 
+        : rat × Infosets ha :=
+    actions_foldl dice ((0 : rat), infosets) (
+        fun ⟨ dice_probability, dice⟩ ⟨ util_sum, infosets ⟩ , 
+            let (util, infosets) := next dice (one_probability * dice_probability) infosets in
+            (util_sum + util * dice_probability, infosets)
+        )
+
+def chance_uniform {ℍ 𝔸 Δ : Type*} [has_lt ℍ]
+        (ha : HistoryToActions ℍ 𝔸) 
+        (dice : Actions Δ)
+        (one_probability : rat) 
+        (next : Δ → rat → Infosets ha -> rat × Infosets ha)
+        (infosets : Infosets ha) 
+        : rat × Infosets ha :=
+    let dice_probability := 1 / dice.1 in
+    chance ha ⟨ dice.1 , fun i, ⟨ dice_probability, dice.2 i ⟩ ⟩ one_probability next infosets
+
+def terminal {ℍ 𝔸 : Type*} [has_lt ℍ]
+        (ha : HistoryToActions ℍ 𝔸)
+        (reward : rat)
+        (infosets : Infosets ha) 
+        : rat × Infosets ha := (reward , infosets)

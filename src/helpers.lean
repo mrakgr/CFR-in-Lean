@@ -51,20 +51,30 @@ def memoize {α : Type*} {β : α → Type*} [h : has_lt α] [decidable_rel h.lt
     | none := let v := f k in (⟨ k, v ⟩ , m.insert k v)
     end
 
-def actions_get {𝔸 : Type*} (actions : Σ (n : nat), fin n → 𝔸)
+def Actions (𝔸 : Type*) := Σ (n : nat), fin n → 𝔸
+def HistoryToActions (ℍ 𝔸 : Type*) := ℍ → Actions 𝔸
+
+def actions_get {𝔸 : Type*} (actions : Actions 𝔸)
         : array actions.1 𝔸 :=
     let ⟨ actions_num, actions_fun ⟩ := actions in
     @nat.foldl.fin (fun n, array n 𝔸) actions_num array.nil
         (fun i a, a.push_back (actions_fun i))
 
-def actions_map {𝔸 β : Type*} (actions : Σ (n : nat), fin n → 𝔸)  
+def actions_map {𝔸 β : Type*} (actions : Actions 𝔸)  
         (f : 𝔸 → β)
         : array actions.1 β :=
     let ⟨ actions_num, actions_fun ⟩ := actions in
     @nat.foldl.fin (fun n, array n β) actions_num array.nil
         (fun i a, a.push_back (f (actions_fun i)))
 
-def actions_map_foldl {𝔸 β σ : Type*} (actions : Σ (n : nat), fin n → 𝔸)  
+def actions_foldl {𝔸 σ : Type*} (actions : Actions 𝔸)  
+        (s : σ) (f : 𝔸 → σ → σ)
+        : σ :=
+    let ⟨ actions_num, actions_fun ⟩ := actions in
+    @nat.foldl.fin (fun n, σ) actions_num s
+        (fun i s, f (actions_fun i) s)
+
+def actions_map_foldl {𝔸 β σ : Type*} (actions : Actions 𝔸)  
         (s : σ) (f : 𝔸 → σ → β × σ)
         : array actions.1 β × σ :=
     let ⟨ actions_num, actions_fun ⟩ := actions in
