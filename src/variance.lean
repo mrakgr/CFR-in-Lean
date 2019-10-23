@@ -1,3 +1,6 @@
+-- Not related to the CFR project.
+-- The variance proof here was just a little thing I did in order to get familiar with Lean.
+
 import data.rat
 
 variable (α : Type)
