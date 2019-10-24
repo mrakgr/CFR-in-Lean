@@ -7,7 +7,8 @@ inductive Action
 | Claim (claim : {n // n ∈ list_claim}) : Action
 | Dudo : Action
 
-def actions : list Action := Action.Dudo :: list_claim.attach.map Action.Claim
+def actions.begin := list_claim.attach.map Action.Claim
+def actions.later := actions.begin ++ [Action.Dudo]
 
 def Action.show : Action → string
 | (Action.Claim claim) := "Claim " ++ has_repr.repr claim.val
@@ -15,8 +16,9 @@ def Action.show : Action → string
 
 instance : has_repr Action := ⟨ Action.show ⟩
 
-structure Particle {ℍ 𝔸 : Type*} := mk ::
+structure Particle {ℍ 𝔸 : Type*} [has_lt ℍ] (ha : HistoryToActions ℍ 𝔸) := mk ::
     (state : {die // die ∈ list_dice})
     (probability : ℚ)
-    (infosets : HistoryToActions ℍ 𝔸)
+    (infosets : Infosets ha)
     (is_updateable : bool)
+
