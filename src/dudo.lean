@@ -28,7 +28,9 @@ instance History_decidable_rel : decidable_rel ((<) : History → History → Pr
 
 def ha : HistoryToActions History Action
     | (_, []) := ⟨ actions.begin.1, actions.begin.read ⟩
-    | (_, x :: xs) := let v := actions.later.drop (x.1 + 1) in ⟨ v.1, v.read ⟩
+    | (_, x :: xs) := 
+        -- TODO: The way buffer.drop behaves on out of bounds is wonky. Replace it.
+        let v := actions.later.drop (x.1 + 1) in ⟨ v.1, v.read ⟩
 
 structure Particle (α : Type*) := mk ::
     (state : α)
