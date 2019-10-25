@@ -94,3 +94,6 @@ def actions_map_foldl2 {𝔸 β χ σ : Type*}
             let ⟨ el, s ⟩ := f (actions i) (ar.read i) s in
             ⟨ a.push_back el, s ⟩
             )
+
+def buffer.attach_index {α : Type*} (a : buffer α) : buffer {i // ∃ v, a.read i = v} :=
+    a.iterate buffer.nil (fun i _ s, s.push_back ⟨ i, ⟨ a.read i, rfl ⟩ ⟩)
