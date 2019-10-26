@@ -1,5 +1,7 @@
 import cfr
 
+example (a b : rat) : (¬ a < b) ∧ (¬ b < a) → a = b := by exact eq_of_incomp
+
 def dice := list.to_buffer [1,2,3,4,5,6]
 def claims := list.to_buffer [(1,2), (1,3), (1,4), (1,5), (1,6), (1,1), (2,2), (2,3), (2,4), (2,5), (2,6), (2,1)]
 def AllowedClaim := {i // ∃ v, claims.read i = v}
@@ -16,8 +18,8 @@ def Action.show : Action → string
 
 instance : has_repr Action := ⟨ Action.show ⟩
 
-def actions.begin := claims.attach_index.iterate buffer.nil (fun i x s, s.push_back $ Action.Claim x)
-def actions.later := actions.begin.push_back Action.Dudo
+def actions.begin := claims.attach_index
+def actions.later := (actions.begin.iterate buffer.nil (fun i x s, s.push_back $ Action.Claim x)).push_back Action.Dudo
 
 def Die := {die // die ∈ dice}
 instance : has_lt Die := ⟨ fun a b, a.val < b.val ⟩
@@ -26,7 +28,11 @@ instance Die_decidable_rel : decidable_rel ((<) : Die → Die → Prop) := infer
 @[derive has_lt] def History := Die × list AllowedClaim
 instance History_decidable_rel : decidable_rel ((<) : History → History → Prop) := infer_instance
 
-def ha : HistoryToActions History Action
+def ℍ𝔸 : History → Type*
+    | (die, []) := AllowedClaim
+    | (die, _) := Action
+
+def ha : HistoryToActions History ℍ𝔸
     | (_, []) := ⟨ actions.begin.1, actions.begin.read ⟩
     | (_, x :: xs) := 
         -- TODO: The way buffer.drop behaves on out of bounds is wonky. Replace it.
@@ -47,12 +53,16 @@ def chance (one : Particle unit) (next : Particle Die → state rat) : state rat
         (fun dice prob, next {state:=dice, probability:=prob*one.probability, ..one})
 
 def response (one two : Particle Die) (h : list AllowedClaim)
-        (next : Action → Particle Die → state rat) 
+        (next : ∀ {h : History}, ℍ𝔸 h → Particle Die → state rat) 
         : state rat :=
     response ha one.is_updateable one.probability two.probability ⟨ one.state, h ⟩
-        (fun action prob, next action {probability:=prob, ..one}) 
+        (fun h action prob, next action {probability:=prob, ..one}) 
 
 def terminal := terminal ha
+
+def dudo.main : Particle Die → Particle Die → list AllowedClaim → state rat
+    | one two [] := response one two [] (fun h action one, dudo.main two one [action])
+    | (claim :: h') := sorry
 
 end game
 

@@ -1,3 +1,20 @@
+-- As it turns out,  these red black trees not being able to understand that the key 
+-- being put in is the same as the one being taken out when doing indexing into them 
+-- is a lot bigger problem than I thought at first. With dependent types, that means 
+-- that it can no longer reduce based on the key and it is causing me all sorts of 
+-- issues downstream.
+
+-- These trees are useless as they are now. I'd recommend avoiding them in favor of 
+-- something that uses direct equality.
+
+-- Note, look into the previous commit for a completed version.
+-- I'll leave this in a half baked state for the time being as I do not
+-- know how to rewrite this to use trichotomnous comparison.
+
+-- In particular, insertion requires a well foundedness proof related to the
+-- standard comparison and I do not feel like spending time in order to thoroughly
+-- get familiar with RB trees just so I can redesign them properly.
+
 prelude
 import init.data.rbtree
 import init.data.rbtree.basic tactic.library_search
@@ -9,51 +26,54 @@ lt a.1 b.1
 
 set_option auto_param.check_exists false
 
-def drbmap (α : Type u) (β : α → Type v) (lt : α → α → Prop . rbtree.default_lt) : Type (max u v) :=
-rbtree (Σ α, β α) (drbmap_lt lt)
+def drbmap (α : Type u) [lt : has_lt α] [is_trichotomous α lt.lt] (β : α → Type v) : Type (max u v) :=
+rbtree (Σ α, β α) (drbmap_lt lt.lt)
 
-def mk_drbmap (α : Type u) (β : α → Type v) (lt : α → α → Prop . rbtree.default_lt) : drbmap α β lt :=
-mk_rbtree (Σ α, β α) (drbmap_lt lt)
+def mk_drbmap (α : Type u) [lt : has_lt α] [is_trichotomous α lt.lt] (β : α → Type v) : drbmap α β :=
+mk_rbtree (Σ α, β α) (drbmap_lt lt.lt)
 
 namespace drbmap
-variables {α : Type u} {β : α → Type v} {δ : Type w} {lt : α → α → Prop}
 
-def empty (m : drbmap α β lt) : bool :=
+def empty {α : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt] 
+    (m : drbmap α β) : bool :=
 m.empty
 
-def to_list (m : drbmap α β lt) : list (Σ α, β α) :=
+def to_list {α : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt]
+    (m : drbmap α β) : list (Σ α, β α) :=
 m.to_list
 
-def min (m : drbmap α β lt) : option (Σ α, β α) :=
+def min {α : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt]
+    (m : drbmap α β) : option (Σ α, β α) :=
 m.min
 
-def max (m : drbmap α β lt) : option (Σ α, β α) :=
+def max {α : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt]
+    (m : drbmap α β) : option (Σ α, β α) :=
 m.max
 
-def fold (f : ∀ (a : α), β a → δ → δ) (m : drbmap α β lt) (d : δ) : δ :=
+def fold {α δ : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt]
+    (f : ∀ (a : α), β a → δ → δ) (m : drbmap α β) (d : δ) : δ :=
 m.fold (λ e, f e.1 e.2) d
 
-def rev_fold (f : ∀ (a : α), β a → δ → δ) (m : drbmap α β lt) (d : δ) : δ :=
+def rev_fold {α δ : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt]
+    (f : ∀ (a : α), β a → δ → δ) (m : drbmap α β) (d : δ) : δ :=
 m.rev_fold (λ e, f e.1 e.2) d
 
-private def mem' (a : α) : ∀ (m : rbnode (Σ α, β α)), Prop
+private def mem' {α : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt]
+    (a : α) : ∀ (m : rbnode (Σ α, β α)), Prop
 | rbnode.leaf           := false
-| (rbnode.red_node l ⟨ v, _ ⟩  r)  := (¬ lt a v ∧ ¬ lt v a) ∨ mem' l ∨ mem' r
-| (rbnode.black_node l ⟨ v, _ ⟩  r)  := (¬ lt a v ∧ ¬ lt v a) ∨ mem' l ∨ mem' r
+| (rbnode.red_node l ⟨ v, _ ⟩  r)  := a < v ∨ a = v ∨ a > v
+| (rbnode.black_node l ⟨ v, _ ⟩  r)  := a < v ∨ a = v ∨ a > v
 
-def mem (k : α) (m : drbmap α β lt) : Prop := @mem' α β lt k m.val
+def mem {α : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt]
+    (k : α) (m : drbmap α β) : Prop := mem' k m.val
 
-instance : has_mem α (drbmap α β lt) := ⟨mem⟩
+instance {α : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt] : has_mem α (drbmap α β) := ⟨mem⟩
 
-instance [has_repr (Σ α, β α)] : has_repr (drbmap α β lt) :=
+instance {α : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt] [has_repr (Σ α, β α)] : has_repr (drbmap α β) :=
 ⟨λ t, "drbmap_of " ++ repr t.to_list⟩
 
-def drbmap_lt_dec [h : decidable_rel lt] : decidable_rel (@drbmap_lt α β lt) :=
-λ a b, h a.1 b.1
-
-variable [decidable_rel lt]
-
-def insert (m : drbmap α β lt) (k : α) (v : β k) : drbmap α β lt :=
+def insert {α : Type u} {β : α → Type v} [lt : has_lt α] [is_trichotomous α lt.lt] 
+    (m : drbmap α β lt) (k : α) (v : β k) : drbmap α β lt :=
 @rbtree.insert _ _ drbmap_lt_dec m ⟨ k, v ⟩
 
 private def find (k : α) : rbnode (Σ α, β α) → option (Σ α, β α)

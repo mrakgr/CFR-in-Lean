@@ -9,8 +9,8 @@ structure Node {𝔸 : Type*} (actions : Σ (n : nat), fin n → 𝔸) := mk ::
     (strategy_sum : array actions.1 rat) 
     (regret_sum : array actions.1 rat)
 
-def Infosets {ℍ 𝔸 : Type*} [lt : has_lt ℍ] (ha : HistoryToActions ℍ 𝔸) 
-    := drbmap ℍ (Node ∘ ha) lt.lt
+def Infosets {ℍ : Type*} {𝔸 : ℍ → Type*} [lt : has_lt ℍ] (ha : HistoryToActions ℍ 𝔸) 
+    := drbmap ℍ (fun h, Node $ ha h) lt.lt
 
 def Node_from_actions {𝔸 : Type*} (actions : Actions 𝔸) := 
     {Node . 
@@ -18,10 +18,13 @@ def Node_from_actions {𝔸 : Type*} (actions : Actions 𝔸) :=
         regret_sum := array.init actions.1 (fun _, 0)
         }
 
-def response {ℍ 𝔸 : Type*} [lt : has_lt ℍ] [decidable_rel lt.lt]
+-- Note: It bothers me a little that `h` and `h'` are not the same thing.
+-- It is all because of the way the red black tree does comparison, but for this
+-- particular use case, the keys should hold equal.
+def response {ℍ : Type*} {𝔸 : ℍ → Type*} [lt : has_lt ℍ] [decidable_rel lt.lt]
         (ha : HistoryToActions ℍ 𝔸)
         (is_updateable : bool) (one_probability two_probability : rat) (h : ℍ)
-        (next : 𝔸 → rat → state (Infosets ha) rat)
+        (next : ∀ {h' : ℍ}, 𝔸 h' → rat → state (Infosets ha) rat)
         : state (Infosets ha) rat := ⟨ fun infosets,
     let (⟨ h' , node⟩ , infosets) := memoize infosets (fun h, Node_from_actions $ ha h) h in
     let action_probability := regret_match node.regret_sum in
@@ -48,7 +51,7 @@ def response {ℍ 𝔸 : Type*} [lt : has_lt ℍ] [decidable_rel lt.lt]
     (-action_utility_weighted_sum, infosets)
     ⟩
 
-def chance {ℍ 𝔸 Δ : Type*} [has_lt ℍ]
+def chance {ℍ Δ : Type*} {𝔸 : ℍ → Type*} [has_lt ℍ]
         (ha : HistoryToActions ℍ 𝔸) 
         (dice : Σ n, fin n → rat × Δ)
         (one_probability : rat) 
@@ -61,7 +64,7 @@ def chance {ℍ 𝔸 Δ : Type*} [has_lt ℍ]
         )
     ⟩ 
 
-def chance_uniform {ℍ 𝔸 Δ : Type*} [has_lt ℍ]
+def chance_uniform {ℍ Δ : Type*} {𝔸 : ℍ → Type*} [has_lt ℍ]
         (ha : HistoryToActions ℍ 𝔸) 
         (dice : Actions Δ)
         (one_probability : rat) 
@@ -70,7 +73,7 @@ def chance_uniform {ℍ 𝔸 Δ : Type*} [has_lt ℍ]
     let dice_probability := 1 / dice.1 in
     chance ha ⟨ dice.1 , fun i, ⟨ dice_probability, dice.2 i ⟩ ⟩ one_probability next
 
-def terminal {ℍ 𝔸 : Type*} [has_lt ℍ]
+def terminal {ℍ : Type*} {𝔸 : ℍ → Type*} [has_lt ℍ]
         (ha : HistoryToActions ℍ 𝔸)
         (reward : rat)
         : state (Infosets ha) rat := pure reward

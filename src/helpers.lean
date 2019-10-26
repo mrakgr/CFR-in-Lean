@@ -52,7 +52,7 @@ def memoize {α : Type*} {β : α → Type*} [h : has_lt α] [decidable_rel h.lt
     end
 
 def Actions (𝔸 : Type*) := Σ (n : nat), fin n → 𝔸
-def HistoryToActions (ℍ 𝔸 : Type*) := ℍ → Actions 𝔸
+def HistoryToActions (ℍ : Type*) (𝔸 : ℍ → Type*) := ∀ (h : ℍ), Actions (𝔸 h)
 
 def actions_get {𝔸 : Type*} (actions : Actions 𝔸)
         : array actions.1 𝔸 :=
