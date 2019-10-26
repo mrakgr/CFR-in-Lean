@@ -9,8 +9,8 @@ structure Node {𝔸 : Type*} (actions : Σ (n : nat), fin n → 𝔸) := mk ::
     (strategy_sum : array actions.1 rat) 
     (regret_sum : array actions.1 rat)
 
-def Infosets {ℍ : Type*} {𝔸 : ℍ → Type*} [lt : has_lt ℍ] (ha : HistoryToActions ℍ 𝔸) 
-    := drbmap ℍ (fun h, Node $ ha h) lt.lt
+def Infosets {ℍ : Type*} {𝔸 : ℍ → Type*} [decidable_eq ℍ] (ha : HistoryToActions ℍ 𝔸) 
+    := buffer (Σ (h : ℍ), Node $ ha h)
 
 def Node_from_actions {𝔸 : Type*} (actions : Actions 𝔸) := 
     {Node . 
@@ -21,37 +21,37 @@ def Node_from_actions {𝔸 : Type*} (actions : Actions 𝔸) :=
 -- Note: It bothers me a little that `h` and `h'` are not the same thing.
 -- It is all because of the way the red black tree does comparison, but for this
 -- particular use case, the keys should hold equal.
-def response {ℍ : Type*} {𝔸 : ℍ → Type*} [lt : has_lt ℍ] [decidable_rel lt.lt]
+def response {ℍ : Type*} {𝔸 : ℍ → Type*} [decidable_eq ℍ]
         (ha : HistoryToActions ℍ 𝔸)
         (is_updateable : bool) (one_probability two_probability : rat) (h : ℍ)
-        (next : ∀ {h' : ℍ}, 𝔸 h' → rat → state (Infosets ha) rat)
+        (next : 𝔸 h → rat → state (Infosets ha) rat)
         : state (Infosets ha) rat := ⟨ fun infosets,
-    let (⟨ h' , node⟩ , infosets) := memoize infosets (fun h, Node_from_actions $ ha h) h in
+    let (i, node , infosets) := memoize infosets (fun h, Node_from_actions $ ha h) h in
     let action_probability := regret_match node.regret_sum in
     let ⟨ action_utility, infosets ⟩ := 
-        actions_map_foldl2 (ha h').2 action_probability 
+        actions_map_foldl2 (ha h).2 action_probability 
             infosets (fun action action_probability infosets, 
                 if action_probability = 0 ∧ two_probability = 0 then (0, infosets) -- the pruning optimization
                 else (next action (one_probability * action_probability)).run infosets
                 ) in
     let action_utility_weighted_sum := 
-        @nat.foldl.fin (fun i, rat) (ha h').1 0 
+        @nat.foldl.fin (fun i, rat) (ha h).1 0 
             (fun i s, s + action_utility.read i * action_probability.read i) in
     let infosets := 
         match is_updateable with
         | tt := 
-            let add (f : ℚ → ℚ) (a b : array (ha h').1 ℚ) := array.map₂ (fun s x, s + f x) a b in 
-            infosets.insert h' {
+            let add (f : ℚ → ℚ) (a b : array (ha h).1 ℚ) := array.map₂ (fun s x, s + f x) a b in 
+            infosets.write' i ⟨ h, {
                 strategy_sum := add (fun action_probability, one_probability * action_probability) node.strategy_sum action_probability,
                 regret_sum := add (fun action_utility, two_probability * (action_utility - action_utility_weighted_sum)) node.regret_sum action_utility
-                }
+                }⟩
         | ff := infosets
         end in
 
     (-action_utility_weighted_sum, infosets)
     ⟩
 
-def chance {ℍ Δ : Type*} {𝔸 : ℍ → Type*} [has_lt ℍ]
+def chance {ℍ Δ : Type*} {𝔸 : ℍ → Type*} [decidable_eq ℍ]
         (ha : HistoryToActions ℍ 𝔸) 
         (dice : Σ n, fin n → rat × Δ)
         (one_probability : rat) 
@@ -64,7 +64,7 @@ def chance {ℍ Δ : Type*} {𝔸 : ℍ → Type*} [has_lt ℍ]
         )
     ⟩ 
 
-def chance_uniform {ℍ Δ : Type*} {𝔸 : ℍ → Type*} [has_lt ℍ]
+def chance_uniform {ℍ Δ : Type*} {𝔸 : ℍ → Type*} [decidable_eq ℍ]
         (ha : HistoryToActions ℍ 𝔸) 
         (dice : Actions Δ)
         (one_probability : rat) 
@@ -73,7 +73,7 @@ def chance_uniform {ℍ Δ : Type*} {𝔸 : ℍ → Type*} [has_lt ℍ]
     let dice_probability := 1 / dice.1 in
     chance ha ⟨ dice.1 , fun i, ⟨ dice_probability, dice.2 i ⟩ ⟩ one_probability next
 
-def terminal {ℍ : Type*} {𝔸 : ℍ → Type*} [has_lt ℍ]
+def terminal {ℍ : Type*} {𝔸 : ℍ → Type*} [decidable_eq ℍ]
         (ha : HistoryToActions ℍ 𝔸)
         (reward : rat)
         : state (Infosets ha) rat := pure reward

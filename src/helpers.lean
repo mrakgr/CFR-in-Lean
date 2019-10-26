@@ -1,5 +1,4 @@
 import data.rat
-import drbmap
 
 private def array.init.template {α : Type*} (f : nat -> α) 
     : ∀ (up down : nat) (ar : array down α), array (down + up + 1) α 
@@ -44,11 +43,18 @@ def array.map_foldl {α β χ : Type*} {n : nat} (a : array n α) (f : α → β
             (a'.push_back el, s)
             )
 
-def memoize {α : Type*} {β : α → Type*} [h : has_lt α] [decidable_rel h.lt] 
-        (m : drbmap α β) (f : ∀ (k : α), β k) (k : α) : (Σ α , β α) × drbmap α β :=
-    match m.find_entry k with
-    | some ⟨ key, node ⟩ := (⟨ key, node ⟩, m)
-    | none := let v := f k in (⟨ k, v ⟩ , m.insert k v)
+def memoize.template {α : Type*} (n : nat) (p : fin n → option α): option α :=
+    @nat.foldl.fin (fun i, option α) n none (fun i s, match s with none := p i | _ := s end)
+
+def memoize {α : Type*} {β : α → Type*} [decidable_eq α] 
+        (m : buffer (Σ α, β α )) (f : ∀ (k : α), β k) (k : α) : nat × β k × buffer (Σ α, β α) :=
+    match @memoize.template (nat × β k × buffer (Σ α, β α)) m.1 (fun i, 
+        let x := m.read i in
+        if h : x.1 = k then by { have := x.2, rw h at this, exact some ⟨ i, this, m ⟩ }
+        else none
+        ) with
+    | (some s) := s
+    | none := let x := f k in ⟨ m.size, x, m.push_back ⟨ k, x ⟩ ⟩
     end
 
 def Actions (𝔸 : Type*) := Σ (n : nat), fin n → 𝔸

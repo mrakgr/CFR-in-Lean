@@ -1,21 +1,11 @@
-import data.rat
-import drbmap
-def claims := list.to_buffer [(1,2), (1,3), (1,4), (1,5), (1,6), (1,1), (2,2), (2,3), (2,4), (2,5), (2,6), (2,1)]
+import data.buffer
 
-def Actions (𝔸 : Type*) := Σ (n : nat), fin n → 𝔸
-def HistoryToActions (ℍ 𝔸 : Type*) := ℍ → Actions 𝔸
+def array.find_index {α} {n} (arr : array n α) (p : α → Prop) [decidable_pred p] : option (fin n) :=
+    arr.iterate none (λ i a o, o <|> if p a then some i else none)
 
-def dice := list.to_buffer [1,2,3,4,5,6]
-def History : Type* := {die // die ∈ dice} × list {i // ∃ v, claims.read i = v}
-
-inductive Action
-| Claim (claim : {i // ∃ v, claims.read i = v}) : Action
-| Dudo : Action
-
-def Infosets {ℍ 𝔸 : Type*} [lt : has_lt ℍ] (ha : HistoryToActions ℍ 𝔸) 
-    := drbmap ℍ (Node ∘ ha) lt.lt
-
-def ha : HistoryToActions History Action := sorry
-
-structure Particle (α : Type*) := mk ::
-    (infosets : Infosets ha)
+def memoize {α : Type*} {β : α → Type*} [decidable_eq α] 
+        (m : buffer (Σ α, β α )) (f : ∀ (k : α), β k) (k : α) : β k × buffer (Σ α, β α) :=
+    match m.2.find_index (fun a, a.1 = k) with
+    | (some i) := let x := m.read i in ⟨ x.2, m ⟩
+    | none := let x := f k in ⟨ x, m.push_back ⟨ k, x ⟩ ⟩
+    end

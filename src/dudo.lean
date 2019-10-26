@@ -56,12 +56,12 @@ def response (one two : Particle Die) (h : list AllowedClaim)
         (next : ∀ {h : History}, ℍ𝔸 h → Particle Die → state rat) 
         : state rat :=
     response ha one.is_updateable one.probability two.probability ⟨ one.state, h ⟩
-        (fun h action prob, next action {probability:=prob, ..one}) 
+        (fun action prob, next action {probability:=prob, ..one}) 
 
 def terminal := terminal ha
 
 def dudo.main : Particle Die → Particle Die → list AllowedClaim → state rat
-    | one two [] := response one two [] (fun h action one, dudo.main two one [action])
+    | one two [] := response one two [] (fun action one, dudo.main two one [action])
     | (claim :: h') := sorry
 
 end game
