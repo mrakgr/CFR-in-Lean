@@ -88,5 +88,7 @@ meta def train (num_iterations : nat): rat × Infosets ha :=
             ((util + util') / 2, infosets)
             )
 
+#eval train 1
+
 end game
 
