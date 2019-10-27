@@ -41,7 +41,6 @@ def ha : HistoryToActions History ℍ𝔸
 structure Particle (α : Type*) := mk ::
     (state : α)
     (probability : ℚ)
-    (infosets : Infosets ha)
     (is_updateable : bool)
 
 namespace game
@@ -53,16 +52,41 @@ def chance (one : Particle unit) (next : Particle Die → state rat) : state rat
         (fun dice prob, next {state:=dice, probability:=prob*one.probability, ..one})
 
 def response (one two : Particle Die) (h : list AllowedClaim)
-        (next : ∀ {h : History}, ℍ𝔸 h → Particle Die → state rat) 
+        (next : ℍ𝔸 ⟨ one.state, h ⟩ → Particle Die → state rat) 
         : state rat :=
     response ha one.is_updateable one.probability two.probability ⟨ one.state, h ⟩
         (fun action prob, next action {probability:=prob, ..one}) 
 
 def terminal := terminal ha
 
-def dudo.main : Particle Die → Particle Die → list AllowedClaim → state rat
+meta def dudo.main : Particle Die → Particle Die → list AllowedClaim → state rat
     | one two [] := response one two [] (fun action one, dudo.main two one [action])
-    | (claim :: h') := sorry
+    | one two h@(⟨i, _⟩ :: _) :=
+        response one two h $ fun action one, 
+            match action with
+            | Action.Dudo := 
+                let (number, rank) := claims.read i in
+                let check_guess (s x : nat) := if x = 1 ∨ x = rank then s+1 else s in
+                let dice_guessed := check_guess (check_guess 0 one.state.val) two.state.val in
+                terminal $ if dice_guessed < number then 1.0 else -1.0                    
+            | Action.Claim claim := dudo.main two one (claim :: h)
+            end
+
+meta def dudo.initial (one : Particle unit) (two : Particle unit) : state rat :=
+    chance one $ fun one, 
+        chance two $ fun two, 
+            dudo.main one two []
+
+meta def train (num_iterations : nat): rat × Infosets ha :=
+    let particle : Particle unit := {state:=(), probability:=1, is_updateable:=ff} in
+    let particle_tt : Particle unit := {is_updateable:=tt, ..particle} in
+    @nat.foldl.fin (fun i, rat × Infosets ha) 
+        num_iterations (0, buffer.nil) 
+        (fun i ⟨ util, infosets ⟩,
+            let (util, infosets) := (dudo.initial {is_updateable:=tt, ..particle} particle).run infosets in
+            let (util', infosets) := (dudo.initial particle {is_updateable:=tt, ..particle}).run infosets in
+            ((util + util') / 2, infosets)
+            )
 
 end game
 
