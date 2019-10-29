@@ -37,7 +37,7 @@ def R.full.pos (i : Player) (T : ℕ) (I : Infoset) := max (R.full i T I) 0
 def R.immediate := R.template (fun σ' I σ, σ.update_at_infosets [I] σ')
 def R.immediate.pos (i : Player) (T : ℕ) (I : Infoset) := max (R.immediate i T I) 0
 
-def lemma_5 (i : Player) (T : ℕ) (I : Infoset) 
+lemma five (i : Player) (T : ℕ) (I : Infoset) 
         : R.full i T I <= R.immediate i T I + (Succ i I).fsum (fun I', R.full.pos i T I) := 
     sorry
     
