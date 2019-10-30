@@ -47,3 +47,4 @@ def u.template (p : Player) (σ : Policy infoset_sizes) (id : Infoset) : Player 
             
 -- By partially applying u, it would be possible to get the same form as in the paper
 def u (tree : GameTree infoset_sizes) (p : Player) (σ : Policy infoset_sizes) (id : Infoset) : ℚ := u.template p σ id 1 tree
+
