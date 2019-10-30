@@ -12,9 +12,6 @@ def nat.foldl.fin {α : nat → Type*}
     let n' : fin (n+1) := ⟨ n, lt_add_one n ⟩ in
     f n' (nat.foldl.fin_template (n+1) n' s f)
 
--- def to_vector {α} (n : nat) (f : fin n → α) : vector α n :=
---     vector.reverse $ @nat.foldl.fin (fun i, vector α i) n vector.nil (fun i s, vector.cons (f i) s)
-
 def Infoset := ℕ 
 def Size := ℕ
 @[derive [has_neg, has_one]] def Player := ℤ
@@ -23,11 +20,11 @@ inductive GameTree (infoset_sizes : Infoset → Size)
 | Terminal (reward : ℚ) : GameTree
 | Response (id : Infoset) (subnodes : fin (infoset_sizes id) → GameTree) : GameTree
 
-def policy_sum (n : ℕ) : fin n → ℚ :=
+def policy_sum {n : ℕ} (f : fin n → ℚ) : ℚ := @nat.foldl.fin (fun i, ℚ) n 0 (fun i s, s + f i)
 
 structure Policy (infoset_sizes : Infoset → Size) := 
     (val : ∀ (id : Infoset), fin (infoset_sizes id) → ℚ)
-    (wf : ∀ (id : Infoset) (i : fin (infoset_sizes id)), 0 <= val id i ∧ val id i <= 1)
+    (wf : ∀ (id : Infoset), policy_sum (val id) = 1)
 
 variable {infoset_sizes : Infoset → Size}
 
