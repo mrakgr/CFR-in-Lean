@@ -1,89 +1,52 @@
-import data.rat
+import data.rat data.vector
 
-constant Infoset : Type
-constant Policy : Type
+def nat.foldl.fin_template {α : nat → Type*} (n' : nat) 
+    : ∀ (n : fin n') (s : α 0) (f : ∀ (n : fin n'), (α n.val) → α (n.val+1)), α n.val
+| ⟨0, _⟩ s f := s
+| ⟨n+1, lt⟩ s f := let n' : fin n' := ⟨n, buffer.lt_aux_1 lt ⟩ in f n' (nat.foldl.fin_template n' s f)
 
-def maximize {α : Type} : α × list α → (α → ℚ) → ℚ | (x,xs) f := xs.foldl (fun s a, max s (f a)) (f x)
-def list.fsum {α : Type} : (α → ℚ) → list α → ℚ | f l := l.foldl (fun s a, s + f a) 0
-constant Infoset.fsum :  (Infoset → ℚ) → Infoset → ℚ
--- Compared to the paper, here I am moving the indexing so it obeys the C notation.
-def nat.fsum (f : ℕ → ℚ) : ℕ → ℚ | 0 := 0 | (n+1) := n.fsum + f n
+def nat.foldl.fin {α : nat → Type*} 
+    : ∀ (n : nat) (s : α 0) (f : ∀ (n : fin n), (α n.val) → α (n.val+1)), α n
+| 0 s f := s
+| (n+1) s f := 
+    let n' : fin (n+1) := ⟨ n, lt_add_one n ⟩ in
+    f n' (nat.foldl.fin_template (n+1) n' s f)
 
-constant σ : ℕ → Policy
-constant σ_all : (ℕ → Policy) × list (ℕ → Policy)
-constant Policy.at : Policy → Infoset → Policy → Policy
+-- def to_vector {α} (n : nat) (f : fin n → α) : vector α n :=
+--     vector.reverse $ @nat.foldl.fin (fun i, vector α i) n vector.nil (fun i s, vector.cons (f i) s)
 
-constant Player : Type
-constant u : Player → Policy → Infoset → ℚ
-constant D : Infoset → Infoset
-constant Succ : Player → Infoset → Infoset
-constant SuccA : Player → Infoset → Policy → Infoset
+def Infoset := ℕ 
+def Size := ℕ
+@[derive [has_neg, has_one]] def Player := ℤ
 
-constant π : Player → Policy → rat
-constant π_is_probability : ∀ i σ, 0 <= π i σ ∧ π i σ <= 1
-constant neg : Player → Player
+inductive GameTree (infoset_sizes : Infoset → Size)
+| Terminal (reward : ℚ) : GameTree
+| Response (id : Infoset) (subnodes : fin (infoset_sizes id) → GameTree) : GameTree
 
-def R.template (update_policy : Policy → Infoset → Policy → Policy) 
-    (i : Player) (T : ℕ) (I : Infoset) : ℚ := 
-    let u := u i in
-    1 / T * 
-    maximize σ_all (fun σ',
-        T.fsum (fun t,
-            let (σ, σ') := (σ t, σ' t) in
-            let σ' := update_policy σ' I σ in
-            π (neg i) σ * (u σ' I - u σ I)
-            )
-        )
-        
-def R.full := R.template (fun σ' I σ, σ.at (D I) σ')
-def R.full.pos (i : Player) (T : ℕ) (I : Infoset) := max (R.full i T I) 0
-def R.imm := R.template (fun σ' I σ, σ.at I σ')
-def R.imm.pos (i : Player) (T : ℕ) (I : Infoset) := max (R.imm i T I) 0
+def policy_sum (n : ℕ) : fin n → ℚ :=
 
-constant A : Infoset → Policy × list Policy
-constant succ : Player → Policy → Infoset → Policy → Infoset → rat
-constant succ_is_probability : ∀ i σ I a I', 0 <= succ i σ I a I' ∧ succ i σ I a I' <= 1
+structure Policy (infoset_sizes : Infoset → Size) := 
+    (val : ∀ (id : Infoset), fin (infoset_sizes id) → ℚ)
+    (wf : ∀ (id : Infoset) (i : fin (infoset_sizes id)), 0 <= val id i ∧ val id i <= 1)
 
-def R.full.expanded (i : Player) (T : ℕ) (I : Infoset) : ℚ := 
-    let u := u i in
-    1 / T * (maximize (A I) $ fun a, maximize σ_all $ fun σ', T.fsum $ fun t, 
-        let (σ, σ') := (σ t, σ' t) in
-        π (neg i) σ * (u (σ.at I a) I - u σ I + (Succ i I).fsum (fun I', succ i σ I a I' * (u (σ.at (D I) σ') I' - u σ I')))
-        )
+variable {infoset_sizes : Infoset → Size}
 
-constant Rfull_eq_expanded (i : Player) (T : ℕ) (I : Infoset) : R.full i T I = R.full.expanded i T I
+-- Calculates the utilities directly.
+def u.dive (σ : Policy infoset_sizes) : GameTree infoset_sizes → ℚ
+| (GameTree.Terminal _ reward) := reward
+| (GameTree.Response id' subnodes) :=
+    let σ := σ.val id' in
+    @nat.foldl.fin (fun i, rat) (infoset_sizes id') 0 (fun i s, s + σ i * u.dive (subnodes i))
 
-lemma five (i : Player) (T : ℕ) (I : Infoset) 
-        : R.full i T I <= R.imm i T I + (Succ i I).fsum (fun I', R.full.pos i T I) := 
-    let u := u i in
-    calc
-        R.full i T I = R.full.expanded i T I : Rfull_eq_expanded i T I
-        ... <= 
-            1 / T * (maximize (A I) $ fun a, maximize σ_all $ fun σ', T.fsum $ fun t, 
-                let (σ, σ') := (σ t, σ' t) in
-                π (neg i) σ * (u (σ.at I a) I - u σ I)
-                ) 
-            + 1 / T * (maximize (A I) $ fun a, maximize σ_all $ fun σ', T.fsum $ fun t, 
-                let (σ, σ') := (σ t, σ' t) in
-                π (neg i) σ * (SuccA i I a).fsum (fun I', succ i σ I a I' * (u (σ.at (D I) σ') I' - u σ I'))
-                ) : sorry
-        ... =
-            R.imm i T I + 1 / T * (maximize (A I) $ fun a, maximize σ_all $ fun σ', T.fsum $ fun t, 
-                let (σ, σ') := (σ t, σ' t) in
-                (SuccA i I a).fsum (fun I', π (neg i) σ * succ i σ I a I' * (u (σ.at (D I') σ') I' - u σ I'))
-                ) : sorry
-        ... = 
-            R.imm i T I + (maximize (A I) $ fun a, (SuccA i I a).fsum $ fun I', 
-                1 / T * (maximize (A I) $ fun a, maximize σ_all $ fun σ', T.fsum $ fun t, 
-                    let (σ, σ') := (σ t, σ' t) in
-                    π (neg i) σ * succ i σ I a I' * (u (σ.at (D I') σ') I' - u σ I')
-                    ) 
-                ) : sorry
-        ... = R.imm i T I + (maximize (A I) $ fun a, (SuccA i I a).fsum $ fun I', R.full i T I') : sorry
-        ... <= R.imm i T I + (Succ i I).fsum (fun I', R.full.pos i T I) : sorry
-    
-lemma six (i : Player) (T : ℕ) (I : Infoset) : R.full i T I <= (D I).fsum (fun I', R.full.pos i T I') :=
-    calc 
-        R.full i T I <= R.imm i T I + ((Succ i I).fsum $ fun I', (Succ i I').fsum $ fun I'', R.full.pos i T I'') : sorry
-        ... <= R.imm.pos i T I + ((Succ i I).fsum $ fun I', (Succ i I').fsum $ fun I'', R.full.pos i T I'') : sorry
-        ... <= (D I).fsum (fun I', R.full.pos i T I') : sorry
+-- Ignores the utilities of nodes that do not match.
+def u.template (p : Player) (σ : Policy infoset_sizes) (id : Infoset) : Player → GameTree infoset_sizes → ℚ
+| p' (GameTree.Terminal _ reward) := 0
+| p' (GameTree.Response id' subnodes) := 
+    if p = p' ∧ id = id' then
+        let σ' := σ.val id' in
+        @nat.foldl.fin (fun i, rat) (infoset_sizes id') 0 $ fun i s, s + σ' i * u.dive σ (subnodes i)
+    else 
+        @nat.foldl.fin (fun i, rat) (infoset_sizes id') 0 $ fun i s, s + u.template (-p') (subnodes i)
+            
+-- By partially applying u, it would be possible to get the same form as in the paper
+def u (tree : GameTree infoset_sizes) (p : Player) (σ : Policy infoset_sizes) (id : Infoset) : ℚ := u.template p σ id 1 tree
