@@ -21,7 +21,7 @@ constant D : Infoset → Infoset
 constant Succ : Player → Infoset → Infoset
 constant SuccA : Player → Infoset → Policy → Infoset
 
-constant π : Player → Policy → Infoset → rat
+constant π : Player → Policy → Infoset → ℚ
 constant π_is_probability : ∀ i σ I, 0 <= π i σ I ∧ π i σ I <= 1
 constant neg : Player → Player
 

@@ -48,3 +48,14 @@ def u.template (p : Player) (σ : Policy infoset_sizes) (id : Infoset) : Player 
 -- By partially applying u, it would be possible to get the same form as in the paper
 def u (tree : GameTree infoset_sizes) (p : Player) (σ : Policy infoset_sizes) (id : Infoset) : ℚ := u.template p σ id 1 tree
 
+inductive Fin : ℕ → Type
+| zero : ∀ {n : ℕ}, Fin (n+1)
+| suc : ∀ {n : ℕ} (i : Fin n), Fin (n+1)
+
+inductive Vec (α : Type) : ℕ → Type
+| nil : ∀ {n : ℕ}, Vec n 
+| cons : ∀ {n : ℕ}, α → Vec n → Vec (n + 1)
+
+inductive GameTree' (infoset_sizes : Infoset → Size)
+| Terminal (reward : ℚ) : GameTree'
+| Response (id : Infoset) (subnodes : Vec GameTree' (infoset_sizes id)) : GameTree'
