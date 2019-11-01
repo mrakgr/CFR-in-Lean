@@ -13,7 +13,7 @@ def nat.foldl.fin {α : nat → Type*}
     f n' (nat.foldl.fin_template (n+1) n' s f)
 
 def Infoset := ℕ 
-def Size := ℕ
+@[derive [has_lt, has_zero]] def Size := ℕ
 @[derive [has_neg, has_one]] def Player := ℤ
 
 inductive GameTree (infoset_sizes : Infoset → Size)
@@ -24,7 +24,7 @@ def policy_sum {n : ℕ} (f : fin n → ℚ) : ℚ := @nat.foldl.fin (fun i, ℚ
 
 structure Policy (infoset_sizes : Infoset → Size) := 
     (val : ∀ (id : Infoset), fin (infoset_sizes id) → ℚ)
-    (wf : ∀ (id : Infoset), policy_sum (val id) = 1)
+    (wf : ∀ (id : Infoset), 0 < infoset_sizes id → policy_sum (val id) = 1 ∧ ∀ (i : fin (infoset_sizes id)), 0 <= val id i ∧ val id i <= 1)
 
 variable {infoset_sizes : Infoset → Size}
 
